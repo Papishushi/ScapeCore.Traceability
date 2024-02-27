@@ -25,58 +25,45 @@ namespace ScapeCore.Traceability.Syntax
                 }
             });
         }
+        record struct CommandParametersPair(Command? Command, List<object>? Parameters);
         private void ParseWordStringToCommandAndExecute(WordString input)
         {
-            int i = 0, h = 0;
-            Command? fCommand = null;
-            Command? fSubCommand = null;
+            int wordCount = 0;
+            int currentCommandNumberExecutionParameters = 0;
 
-            List<object> parameterParameters = [], commandParameters = [];
+            List<CommandParametersPair> commands = [];
+
+            Command? currentCommand = null;
+            List<object> currentCommandParameters = [];
+
             foreach (var word in input)
             {
+                wordCount++;
+
                 if (word == "|")
                 {
-                    if (fSubCommand == null)
-                        h = ExecuteCommand(ref fCommand, commandParameters);
-                    else
-                        i = ExecuteCommand(ref fSubCommand, parameterParameters);
+                    ExecuteAndClear(commands);
+                    currentCommand = null;
                     continue;
                 }
 
-                fCommand ??= AvailableCommands.Find(x => x.Info.Name.Equals(word, StringComparison.OrdinalIgnoreCase));
-
-                if (fCommand != null && fCommand!.Info.Name != null)
+                if (currentCommand == null)
                 {
-                    fSubCommand ??= fCommand.Info.Subcommands?.ToList().Find(x => x.Info.Name.Equals(word, StringComparison.OrdinalIgnoreCase));
-                    if (fSubCommand != null && fSubCommand!.Info.Name != null)
+                    currentCommand = AvailableCommands.Find(x => x.Info.Name.Equals(word, StringComparison.OrdinalIgnoreCase));
+                    continue;
+                }
+
+                if (currentCommand != null && currentCommand!.Info.Name != null)
+                {
+                    var subCommand = currentCommand.Info.Subcommands?.ToList().Find(x => x.Info.Name.Equals(word, StringComparison.OrdinalIgnoreCase));
+
+                    if (subCommand != null && subCommand!.Info.Name != null)
                     {
-                        if (fSubCommand.Info.NumberOfExecutionParameters > 0)
-                        {
-                            parameterParameters.Add(word);
-                            if (i++ == fSubCommand.Info.NumberOfExecutionParameters || input.Last() == word)
-                                i = ExecuteCommand(ref fSubCommand, parameterParameters);
-                        }
-                        else
-                        {
-                            LinkedLogger.Log("debug", fSubCommand.ToString());
-                            fSubCommand.DefaultExecution(null);
-                            fSubCommand = null;
-                        }
+                        currentCommand = subCommand;
+                        continue;
                     }
                     else
-                    {
-                        if (fCommand.Info.NumberOfExecutionParameters > 0)
-                        {
-                            commandParameters.Add(word);
-                            if (h++ == fCommand.Info.NumberOfExecutionParameters || input.Last() == word)
-                                h = ExecuteCommand(ref fCommand, commandParameters);
-                        }
-                        else
-                        {
-                            fCommand.DefaultExecution(null);
-                            fCommand = null;
-                        }
-                    }
+                        ProcessCommand(ref currentCommand, ref currentCommandNumberExecutionParameters, word, currentCommandParameters, commands);
                 }
                 else
                 {
@@ -85,12 +72,37 @@ namespace ScapeCore.Traceability.Syntax
                 }
             }
 
-            static int ExecuteCommand(ref Command? fCommand, List<object> commandParameters)
+            ExecuteAndClear(commands);
+        }
+
+
+        private void ExecuteAndClear(List<CommandParametersPair> commands)
+        {
+            while (commands.Count > 0)
             {
-                fCommand?.DefaultExecution([.. commandParameters]);
-                fCommand = null;
-                commandParameters.Clear();
-                return 0;
+                var item = commands.Last();
+                item.Command?.DefaultExecution([.. item.Parameters]);
+                commands.Remove(item);
+            }
+            commands.Clear();
+        }
+
+        private void ProcessCommand(ref Command? currentCommand, ref int currentCommandNumberExecutionParameters, string word, List<object> currentCommandParameters, List<CommandParametersPair> commands)
+        {
+            if (currentCommand!.Info.NumberOfExecutionParameters > 0)
+            {
+                currentCommandParameters.Add(word);
+                if (++currentCommandNumberExecutionParameters == currentCommand.Info.NumberOfExecutionParameters)
+                {
+                    commands.Add(new(currentCommand, currentCommandParameters));
+                    currentCommandNumberExecutionParameters = 0;
+                    currentCommand = currentCommand.Info.Parent;
+                }
+            }
+            else
+            {
+                commands.Add(new(currentCommand, null));
+                currentCommand = currentCommand.Info.Parent;
             }
         }
     }

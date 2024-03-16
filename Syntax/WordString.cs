@@ -11,7 +11,7 @@ namespace ScapeCore.Traceability.Syntax
             this.words = words;
             lenght = words.Length;
         }
-        public WordString(string input) : this(input.Split(' ', StringSplitOptions.TrimEntries)) { }
+        public WordString(string input) : this(input.Split(' ', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)) { }
 
         public int Count => ((ICollection<string>)words).Count;
 

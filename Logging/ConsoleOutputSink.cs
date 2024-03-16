@@ -1,21 +1,15 @@
 ﻿namespace ScapeCore.Traceability.Logging
 {
-    public sealed class ConsoleOutputSink : ISink
+    public sealed class ConsoleOutputSink(string name, LoggingColor color) : ISink
     {
-        private readonly string _name = string.Empty;
-        private readonly ConsoleColor _color = ConsoleColor.White;
+        private readonly string _name = name;
+        private readonly LoggingColor _color = color;
         private BufferedStream? _stream = new(Console.OpenStandardOutput());
         private BufferedStream? _selfStream = new(new MemoryStream());
         private bool disposedValue;
 
-        public ConsoleOutputSink(string name, ConsoleColor color)
-        {
-            _name = name;
-            _color = color;
-        }
-
         public string Name { get => _name; }
-        public ConsoleColor Color { get => _color; }
+        public LoggingColor Color { get => _color; }
         public Stream? OutputStream { get => _stream; }
         public Stream? SelfStream { get => _selfStream; }
 
@@ -27,6 +21,8 @@
                 {
                     _stream?.Dispose();
                     _stream = null;
+                    _selfStream?.Dispose();
+                    _selfStream = null;
                 }
 
                 disposedValue = true;
@@ -53,6 +49,11 @@
                 await _stream.DisposeAsync().ConfigureAwait(false);
 
             _stream = null;
+
+            if (_selfStream is not null)
+                await _selfStream.DisposeAsync().ConfigureAwait(false);
+
+            _selfStream = null;
         }
 
     }

@@ -1,16 +1,18 @@
 ﻿using ScapeCore.Traceability.Logging;
+using System.Linq;
 
 namespace ScapeCore.Traceability.Syntax
 {
-    public record CommandParser(TerminalLogger LinkedLogger)
+    public class CommandParser(TerminalLogger linkedLogger)
     {
+        public TerminalLogger LinkedLogger { get; init; } = linkedLogger;
         bool _isRunning = true;
         public readonly List<Command> AvailableCommands = [];
 
         ~CommandParser() => _isRunning = false;
-        public async Task CommandParsingLoop()
+        internal async Task CommandParsingLoop()
         {
-            await Task.Run(() =>
+            await Task.Run(async () =>
             {
                 while (_isRunning)
                 {
@@ -21,89 +23,159 @@ namespace ScapeCore.Traceability.Syntax
 
                     if (string.IsNullOrEmpty(input)) continue;
 
-                    ParseWordStringToCommandAndExecute(new WordString(input));
+                    var count = await ParseWordStringToCommandAndExecute(new WordString(input));
+
+                    Console.WriteLine($"{count} words were processed succesfully...");
                 }
             });
         }
-        record struct CommandParametersPair(Command? Command, List<object>? Parameters);
-        private void ParseWordStringToCommandAndExecute(WordString input)
+
+        private async Task<int> ParseWordStringToCommandAndExecute(WordString input) => await Task.Run( () => input.Contains(":") && !input.ElementAt(0).Contains(':') ? ParallelParser(input).wordCounter : SimpleParser(input));
+
+        public class ParallelParserResult
         {
-            int wordCount = 0;
+            public ParallelLoopResult result;
+            public int wordCounter;
+        }
+        private ParallelParserResult ParallelParser(WordString input)
+        {
+            var lastIndex = -1;
+            var pipes = new List<WordString>();
+
+            while (true)
+            {
+                var index = input.ToList().IndexOf(":", lastIndex + 1);
+                bool isLast = index == lastIndex || index == -1;
+
+                var joinedCommand = isLast ?
+                    string.Join(' ', input.Skip(input.ToList().IndexOf(":", lastIndex) + 1)) :
+                    string.Join(' ', input.Select((x, i) =>
+                    {
+                        if (i > (lastIndex == 0 ? -1 : lastIndex) && i < index)
+                            return x;
+                        return string.Empty;
+                    })).Trim();
+
+                pipes.Add(new(joinedCommand));
+
+                if (isLast)
+                    break;
+
+                lastIndex = index;
+            }
+
+            ParallelParserResult result = new();
+            result.result = Parallel.ForEach(pipes, () => 0, (pipe, state, localCount) =>
+            {
+                localCount += SimpleParser(pipe);
+                return localCount;
+            }, localCount =>
+            {
+                Interlocked.Add(ref result.wordCounter, localCount);
+            });
+
+            return result;
+        }
+
+        readonly record struct CommandParametersPair(Command? Command, List<object>? Parameters);
+        private int SimpleParser(WordString input)
+        {
+            bool skipCurrentCommand = false;
             int currentCommandNumberExecutionParameters = 0;
+            int wordCount = 0;
 
-            List<CommandParametersPair> commands = [];
-
+            List<CommandParametersPair> commandsToExecute = [];
             Command? currentCommand = null;
             List<object> currentCommandParameters = [];
 
             foreach (var word in input)
             {
-                wordCount++;
-
                 if (word == "|")
                 {
-                    ExecuteAndClear(commands);
+                    ExecuteAndClear(commandsToExecute);
                     currentCommand = null;
                     continue;
                 }
 
-                if (currentCommand == null)
-                {
-                    currentCommand = AvailableCommands.Find(x => x.Info.Name.Equals(word, StringComparison.OrdinalIgnoreCase));
-                    continue;
-                }
+                wordCount++;
+
+                currentCommand ??= AvailableCommands.Find(x => x.Info.Name.Equals(word, StringComparison.OrdinalIgnoreCase));
 
                 if (currentCommand != null && currentCommand!.Info.Name != null)
                 {
-                    var subCommand = currentCommand.Info.Subcommands?.ToList().Find(x => x.Info.Name.Equals(word, StringComparison.OrdinalIgnoreCase));
+                    var subCommand = currentCommand.Subcommands?.ToList().Find(x => x.Info.Name.Equals(word, StringComparison.OrdinalIgnoreCase));
 
                     if (subCommand != null && subCommand!.Info.Name != null)
-                    {
                         currentCommand = subCommand;
-                        continue;
+
+                    if (currentCommand!.Info.NumberOfExecutionParameters > 0)
+                    {
+                        if (!word.Equals(currentCommand.Info.Name, StringComparison.OrdinalIgnoreCase))
+                            currentCommandParameters.Add(word);
+                        if (currentCommandNumberExecutionParameters++ == currentCommand.Info.NumberOfExecutionParameters)
+                        {
+                            if (!commandsToExecute.Contains(new(currentCommand, new(currentCommandParameters))))
+                            {
+                                commandsToExecute.Add(new(currentCommand, new(currentCommandParameters)));
+                                currentCommandNumberExecutionParameters = 0;
+                                currentCommandParameters.Clear();
+                                if (currentCommand!.Subcommands!.Length <= 0)
+                                    currentCommand = currentCommand.Parent ?? currentCommand;
+                            }
+                        else
+                        {
+                            LinkedLogger.Log("error", $"{new LoggingColor(255, 32, 22)}Subcommand {word} does not exist. Did you mispelled something?{LoggingColor.Normal}");
+                            skipCurrentCommand = true;
+                            break;
+                        }
+                        }
                     }
                     else
-                        ProcessCommand(ref currentCommand, ref currentCommandNumberExecutionParameters, word, currentCommandParameters, commands);
+                    {
+                        if (!commandsToExecute.Contains(new(currentCommand, null)))
+                        {
+                            commandsToExecute.Add(new(currentCommand, null));
+                            if (currentCommand!.Subcommands!.Length <= 0)
+                                currentCommand = currentCommand.Parent ?? currentCommand;
+                        }
+                        else
+                        {
+                            LinkedLogger.Log("error", $"{new LoggingColor(255, 32, 22)}Subcommand {word} does not exist. Did you mispelled something?{LoggingColor.Normal}");
+                            skipCurrentCommand = true;
+                            break;
+                        }
+                    }
                 }
                 else
                 {
-                    LinkedLogger.Log("error", $"Command {word} does not exist. Did you mispelled something?");
-                    continue;
+                    LinkedLogger.Log("error", $"{new LoggingColor(255, 32, 22)}Command {word} does not exist. Did you mispelled something?{LoggingColor.Normal}");
+                    skipCurrentCommand = true;
+                    break;
                 }
             }
 
-            ExecuteAndClear(commands);
-        }
+            if (skipCurrentCommand)
+                commandsToExecute.Clear();
 
+            ExecuteAndClear(commandsToExecute);
+
+            return wordCount;
+        }
 
         private void ExecuteAndClear(List<CommandParametersPair> commands)
         {
             while (commands.Count > 0)
             {
                 var item = commands.Last();
-                item.Command?.DefaultExecution([.. item.Parameters]);
-                commands.Remove(item);
-            }
-            commands.Clear();
-        }
-
-        private void ProcessCommand(ref Command? currentCommand, ref int currentCommandNumberExecutionParameters, string word, List<object> currentCommandParameters, List<CommandParametersPair> commands)
-        {
-            if (currentCommand!.Info.NumberOfExecutionParameters > 0)
-            {
-                currentCommandParameters.Add(word);
-                if (++currentCommandNumberExecutionParameters == currentCommand.Info.NumberOfExecutionParameters)
+                if (item.Command != null)
                 {
-                    commands.Add(new(currentCommand, currentCommandParameters));
-                    currentCommandNumberExecutionParameters = 0;
-                    currentCommand = currentCommand.Info.Parent;
+                    if (!item.Command!.supress)
+                        item.Command!.DefaultExecution(item.Parameters != null ? [.. item.Parameters] : null);
+                    item.Command!.supress = false;
+                    commands.Remove(item);
                 }
             }
-            else
-            {
-                commands.Add(new(currentCommand, null));
-                currentCommand = currentCommand.Info.Parent;
-            }
+            commands.Clear();
         }
     }
 }

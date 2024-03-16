@@ -3,7 +3,7 @@
     public interface ISink : IDisposable, IAsyncDisposable
     {
         public string Name { get; }
-        public ConsoleColor Color { get; }
+        public LoggingColor Color { get; }
         public Stream? OutputStream { get; }
         public Stream? SelfStream { get; }
     }

@@ -5,7 +5,7 @@ namespace ScapeCore.Traceability.Logging
     public interface ILogger : IAsyncDisposable
     {
         public string Name { get; set; }
-        public string Template { get; }
+        public Func<string> Template { get; }
         public ISink[] Sinks { get; }
         public CommandParser LinkedParser { get; init; }
 

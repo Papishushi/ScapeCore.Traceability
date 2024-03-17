@@ -32,7 +32,7 @@ namespace ScapeCore.Traceability.Syntax
 
         private async Task<int> ParseWordStringToCommandAndExecute(WordString input) => await Task.Run( () => input.Contains(":") && !input.ElementAt(0).Contains(':') ? ParallelParser(input).wordCounter : SimpleParser(input));
 
-        public class ParallelParserResult
+        public record class ParallelParserResult
         {
             public ParallelLoopResult result;
             public int wordCounter;

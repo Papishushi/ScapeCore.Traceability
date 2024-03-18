@@ -79,8 +79,6 @@ namespace ScapeCore.Traceability.Logging
             }
             else
                 RemovePreviousLine();
-
-            RemoveNextLine(); 
         }
 
         public int GetSinkIndex(ISink sink)
@@ -104,16 +102,6 @@ namespace ScapeCore.Traceability.Logging
                 Console.SetCursorPosition(0, Console.CursorTop - 1);
                 Console.Write(new string(' ', Console.BufferWidth));
                 Console.SetCursorPosition(0, Console.CursorTop);
-            }
-        }
-
-        private static void RemoveNextLine()
-        {
-            lock (_lock)
-            {
-                Console.SetCursorPosition(0, Console.CursorTop + 1);
-                Console.Write(new string(' ', Console.BufferWidth));
-                Console.SetCursorPosition(0, Console.CursorTop -1);
             }
         }
 

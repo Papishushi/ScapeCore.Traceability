@@ -1,4 +1,8 @@
-﻿namespace ScapeCore.Traceability.Logging
+﻿using System;
+using System.IO;
+using System.Threading.Tasks;
+
+namespace ScapeCore.Traceability.Logging
 {
     public sealed class ConsoleErrorSink(string name, LoggingColor color) : ISink
     {

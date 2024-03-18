@@ -1,5 +1,9 @@
-﻿using System.Drawing;
+﻿using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.IO;
 using System.Text;
+using System.Threading.Tasks;
 using ScapeCore.Traceability.Syntax;
 using static ScapeCore.Traceability.Logging.LoggingColor;
 
@@ -82,7 +86,7 @@ namespace ScapeCore.Traceability.Logging
             }
         }
 
-        async ValueTask IAsyncDisposable.DisposeAsync() =>
+        public async ValueTask DisposeAsync() =>
             await Parallel.ForEachAsync(_perSinkStreamWriters,
                 async (element, cT) =>
                 {
@@ -94,5 +98,6 @@ namespace ScapeCore.Traceability.Logging
                     await element!.Value.writers.self.DisposeAsync();
                     await element!.Value.sink.DisposeAsync();
                 });
+
     }
 }

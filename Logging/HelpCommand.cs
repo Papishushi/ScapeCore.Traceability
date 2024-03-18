@@ -1,5 +1,6 @@
 ﻿using ScapeCore.Traceability.Logging;
 using ScapeCore.Traceability.Syntax;
+using System;
 
 record class HelpCommand : Command
 {

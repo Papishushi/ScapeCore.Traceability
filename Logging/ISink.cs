@@ -1,4 +1,7 @@
-﻿namespace ScapeCore.Traceability.Logging
+﻿using System;
+using System.IO;
+
+namespace ScapeCore.Traceability.Logging
 {
     public interface ISink : IDisposable, IAsyncDisposable
     {

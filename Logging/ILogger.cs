@@ -1,4 +1,5 @@
 ﻿using ScapeCore.Traceability.Syntax;
+using System;
 
 namespace ScapeCore.Traceability.Logging
 {

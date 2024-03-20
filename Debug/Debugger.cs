@@ -14,20 +14,22 @@ namespace ScapeCore.Traceability.Debug
         public const string DEBUG = "DEBUG";
         public const string ERROR = "ERROR";
         public const string WARNING = "WARNING";
+        public const string INFORMATION = "INFORMATION";
         public const string VERBOSE = "VERBOSE";
 
         private static readonly TerminalLogger _log = new([
             (0, new ConsoleErrorSink(ERROR, new LoggingColor(255, 58, 36))),
             (1, new ConsoleErrorSink(WARNING, new LoggingColor(255, 129, 26))),
             (2, new ConsoleOutputSink(INPUT, new LoggingColor(100, 200, 208))),
-            (3, new ConsoleOutputSink(DEBUG, new LoggingColor(128, 117, 108))),
-            (4, new ConsoleErrorSink(VERBOSE, new LoggingColor(50, 129, 26))),
+            (3, new ConsoleOutputSink(INFORMATION, new LoggingColor(128, 117, 108))),
+            (4, new ConsoleOutputSink(DEBUG, new LoggingColor(128, 117, 108))),
+            (5, new ConsoleErrorSink(VERBOSE, new LoggingColor(50, 129, 26))),
         ])
         {
             Name = "Test",
             Directory = Directory.CreateTempSubdirectory("ScapeCore"),
             Template = () => $"{new LoggingColor(255, 253, 125)}[{DateTime.Now:T}]{LoggingColor.Default}",
-            MinimumLoggingLevel = 3
+            MinimumLoggingLevel = 4
         };
         public static TerminalLogger SCLog { get => _log; }
 
@@ -52,7 +54,7 @@ namespace ScapeCore.Traceability.Debug
                 if (!string.IsNullOrEmpty(val))
                     sb.AppendLine(val);
                 Console.Write(sb.ToString());
-                helpCommand.supress = true;
+                helpCommand.suppress = true;
             }, helpCommand, true);
             helpCommand.AddSubcommand(helpByCommand);
             var clearCommand = new Command(new("CLEAR", 0, "Clears the display."), (_) => Console.Clear(), addHelp: true);

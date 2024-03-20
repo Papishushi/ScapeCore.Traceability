@@ -24,12 +24,13 @@ namespace ScapeCore.Traceability.Logging
         public CommandParser LinkedParser { get; init; }
 
         public ISink[] Sinks { get => [.. _sinks.Select(x => x.sink)]; }
+        public static object Lock => _lock;
 
         private TerminalLogger() => _ = 0;
         public TerminalLogger(params (uint index, ISink sink)[] sinks)
         {
             _sinks.AddRange(sinks);
-            foreach(var sink in _sinks.Select(x => x.sink))
+            foreach(var (_, sink) in _sinks)
                 _perSinkStreamWriters.Add((sink,
                                    (new StreamWriter(sink.OutputStream ?? throw new ArgumentNullException(message: "Sink output stream is null.", null), 
                                     leaveOpen: true, encoding: Encoding.Default)
@@ -46,8 +47,6 @@ namespace ScapeCore.Traceability.Logging
             Console.WriteLine("SDK CLI Encoding: " + Encoding.Default.EncodingName);
             LinkedParser = new CommandParser(this);
         }
-
-
 
         public void AddSink(uint index, ISink sink) => _sinks.Add((index, sink));
         public void RemoveSink(string sinkName) => _sinks.Remove(_sinks.Find(x => x.sink.Name == sinkName));
@@ -70,61 +69,75 @@ namespace ScapeCore.Traceability.Logging
                         RemovePreviousLine();
 
                     ConsoleLogContent(sink, format, substitutions);
-                }
 
-                Task.Run(() =>
-                {
-                    writers.self.WriteLine($"[{sink.Name}]{Template()} {format}", substitutions);
-                });
+                    Task.Run(() =>
+                    {
+                        writers.self.WriteLine($"[{sink.Name}]{Template()} {format}", substitutions);
+                    });
+                }
             }
             else
                 RemovePreviousLine();
         }
 
-        public int GetSinkIndex(ISink sink)
-        {
-            try
-            {
-                var temp = _sinks.Find(x => x.sink.Name == sink.Name);
-                if (temp == default) return -1;
-                else return (int)temp.index;
-            }
-            catch (ArgumentNullException)
-            {
-                return -1;
-            }
-        }
+        public int GetSinkIndex(ISink sink) => _sinks.FindIndex(x => x.sink.Name == sink.Name);
+
 
         private static void RemovePreviousLine()
         {
-            lock (_lock)
+            Monitor.Enter(_lock);
+            try
             {
                 Console.SetCursorPosition(0, Console.CursorTop - 1);
                 Console.Write(new string(' ', Console.BufferWidth));
                 Console.SetCursorPosition(0, Console.CursorTop);
             }
+            finally
+            {
+                Monitor.Exit(_lock);
+            }
         }
 
         private void ConsoleLogContent(ISink sink, string format, object[] substitutions)
         {
-            lock (_lock)
+            string skipLine = (Console.CursorLeft != 0) ? "\r\n" : string.Empty;
+            var finalFormat = $"{skipLine}{Bold}{sink.Color}[{sink.Name}]{Normal}{Template()}{Normal} {format}";
+
+            Monitor.Enter(_lock);
+            try
             {
-                Console.WriteLine($"{Bold}{sink.Color}[{sink.Name}]{Normal}{Template()}{Normal} {format}", substitutions);
+                if (substitutions.Length > 0)
+                    Console.WriteLine(finalFormat, substitutions);
+                else
+                    Console.WriteLine(finalFormat);
+            }
+            finally
+            {
+                Monitor.Exit(_lock);
             }
         }
 
-        public async ValueTask DisposeAsync() =>
-            await Parallel.ForEachAsync(_perSinkStreamWriters,
-                async (element, cT) =>
+
+        public async ValueTask DisposeAsync()
+        {
+            var disposalTasks = _perSinkStreamWriters.Select(async element =>
+            {
+                try
                 {
-                    cT.ThrowIfCancellationRequested();
-
-                    _sinks.Clear();
-
                     await element!.Value.writers.output.DisposeAsync();
                     await element!.Value.writers.self.DisposeAsync();
                     await element!.Value.sink.DisposeAsync();
-                });
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"{Red}An error occurred during terminal logger disposal: {Yellow}{ex.Message}{Default}");
+                }
+            });
+
+            await Task.WhenAll(disposalTasks);
+            _sinks.Clear();
+        }
+
 
     }
 }

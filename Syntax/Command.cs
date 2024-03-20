@@ -9,10 +9,7 @@ using static ScapeCore.Traceability.Logging.LoggingColor;
 
 namespace ScapeCore.Traceability.Syntax
 {
-    public readonly record struct CommandInfo(string Name, int NumberOfExecutionParameters, string Help)
-    {
-
-    }
+    public readonly record struct CommandInfo(string Name, int NumberOfExecutionParameters, string Help);
     public record class Command(CommandInfo Info, Action<object[]?> DefaultExecution, Command? Parent = null)
     {
         public Command? Parent { get; init; } = Parent;
@@ -24,7 +21,7 @@ namespace ScapeCore.Traceability.Syntax
         public void RemoveSubcommand(Command command) => _subcommands.Remove(command);
         public void ClearSubcommands() => _subcommands.Clear();
 
-        public bool supress = false;
+        public bool suppress = false;
 
         public Command(CommandInfo info, Action<object[]?> defaultExecution, Command? parent = null, bool addHelp = true) : this(info, defaultExecution, parent) 
         {
@@ -32,13 +29,13 @@ namespace ScapeCore.Traceability.Syntax
                 _subcommands.Add(new HelpCommand(this));
         }
 
-        public static void PropagateSupress(bool supress, Command? parent = null)
+        public static void PropagateSuppress(bool suppress, Command? parent = null)
         {
             var lastParent = parent;
             while (true)
             {
                 if (lastParent != null)
-                    lastParent.supress = supress;
+                    lastParent.suppress = suppress;
                 else
                     break;
                 lastParent = lastParent.Parent;

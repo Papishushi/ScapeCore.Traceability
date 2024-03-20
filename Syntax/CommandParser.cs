@@ -22,15 +22,24 @@ namespace ScapeCore.Traceability.Syntax
                 while (_isRunning)
                 {
                     var cd = LinkedLogger.Directory.FullName;
-                    Console.Write($" > (\\scapecore{Directory.GetCurrentDirectory().Remove(0, cd.Length)}) ");
-                    var input = Console.ReadLine();
+                    Monitor.Enter(TerminalLogger.Lock);
+                    try
+                    {
+                        Console.Write($" > (\\scapecore{Directory.GetCurrentDirectory().Remove(0, cd.Length)}) ");
+                    }
+                    finally
+                    {
+                        Monitor.Exit(TerminalLogger.Lock);
+                    }
+
+                    var input = Console.ReadLine()?.Trim();
                     LinkedLogger.Log("input", input, true);
 
                     if (string.IsNullOrEmpty(input)) continue;
 
                     var count = await ParseWordStringToCommandAndExecute(new WordString(input));
 
-                    Console.WriteLine($"{count} words were processed succesfully...");
+                    Console.WriteLine($"{count} words were processed successfully...");
                 }
             });
         }
@@ -174,9 +183,9 @@ namespace ScapeCore.Traceability.Syntax
                 var item = commands.Last();
                 if (item.Command != null)
                 {
-                    if (!item.Command!.supress)
+                    if (!item.Command!.suppress)
                         item.Command!.DefaultExecution(item.Parameters != null ? [.. item.Parameters] : null);
-                    item.Command!.supress = false;
+                    item.Command!.suppress = false;
                     commands.Remove(item);
                 }
             }

@@ -6,12 +6,12 @@ namespace ScapeCore.Traceability.Syntax
 {
     public readonly record struct WordString : ICollection<string>
     {
-        public readonly int lenght;
+        public readonly int length;
         public readonly string[] words;
         public WordString(string[] words)
         {
             this.words = words;
-            lenght = words.Length;
+            length = words.Length;
         }
         public WordString(string input) : this(input.Split(' ', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)) { }
 

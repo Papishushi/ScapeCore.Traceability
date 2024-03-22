@@ -15,7 +15,9 @@
     <RepositoryType>git</RepositoryType>
     <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
     <PackageId>ScapeCore.Traceability</PackageId>
-    <Version>1.1.0</Version>
+    <Version>1.2.0</Version>
+    <RootNamespace>ScapeCore.$(MSBuildProjectName.Replace(" ", "_"))</RootNamespace>
+    <AssemblyName>ScapeCore.$(MSBuildProjectName.Replace(" ", "_"))</AssemblyName>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">

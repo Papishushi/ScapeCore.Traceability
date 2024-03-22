@@ -8,7 +8,6 @@ namespace ScapeCore.Traceability.Logging
         public string Name { get; set; }
         public Func<string> Template { get; }
         public ISink[] Sinks { get; }
-        public CommandParser LinkedParser { get; init; }
 
         public void Log(string sinkName, string? format, bool isOverwritingLog = false, params object[] substitutions);
     }
